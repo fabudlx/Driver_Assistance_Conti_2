@@ -9,16 +9,26 @@ import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 
 #calculate the meassures of the arrow
-def get_angle_paramerters(last_meassurs, speed, accel, steer_angle, no_break):
+def get_angle_paramerters(last_meassurs, speed, accel, steer_angle, no_break, future_steer):
 
     arrow_length = speed # length of arrow, detirmined by speed of car
     arrow_width = 0.3# arrow width, detirmined by acceleration
     if steer_angle < 0.35:
-        arrow_courve = 0.4
-    elif steer_angle >0.7:
-        arrow_courve = 0.75
+        steer_angle = 0.35
+    elif steer_angle >0.75:
+        steer_angle = 0.75
+
+    arrow_courve = steer_angle # arrow courvage, detirmined by steer_angle
+
+    if future_steer < 0.35:
+        future_steer = 0.35
+    elif future_steer >0.75:
+        future_steer = 0.75
+
+    if future_steer**2-steer_angle**2 >0.03:
+        future_arrow_curve = future_steer
     else:
-        arrow_courve = steer_angle # arrow courvage, detirmined by steer_angle
+        future_arrow_curve = steer_angle
 
     if no_break == 0:
         arrow_color = 'red'
@@ -27,10 +37,10 @@ def get_angle_paramerters(last_meassurs, speed, accel, steer_angle, no_break):
     else:
         arrow_color = 'green'
 
-    return arrow_length, arrow_width, arrow_courve, arrow_color
+    return arrow_length, arrow_width, arrow_courve, arrow_color, future_arrow_curve
 
 # get the array data
-def get_arrow(arrow_length, arrow_width, arrow_courve, arrow_color):
+def get_arrow(arrow_length, arrow_width, arrow_courve, arrow_color, future_arrow_curve):
     # x_tail = 0.5
     # y_tail = 0.16
     #
@@ -46,9 +56,13 @@ def get_arrow(arrow_length, arrow_width, arrow_courve, arrow_color):
 
     style = ("Simple,tail_width=" + str(50) + ",head_width=" + str(100) + ",head_length=" + str(30))
     kw = dict(arrowstyle=style, color=arrow_color)
-
     arrow = mpatches.FancyArrowPatch((0, 0), ((arrow_courve - 0.5), 0.3 + arrow_length*1.25), connectionstyle=("arc3,rad=" + str(-1 * (arrow_courve - 0.5))), **kw)
 
+    style2 = ("Simple,tail_width=" + str(50) + ",head_width=" + str(100) + ",head_length=" + str(30))
+    kw2 = dict(arrowstyle=style2, color='k', fill=False, linestyle='dashed')
+    arrow2 = mpatches.FancyArrowPatch((0, 0), ((future_arrow_curve - 0.5), 0.3 + arrow_length * 1.25), connectionstyle=("arc3,rad=" + str(-1 * (arrow_courve - 0.5))), **kw2)
+
+    axs.add_patch(arrow2)
     axs.add_patch(arrow)
     axs.set_axis_off()
     fig.add_axes(axs)
@@ -96,12 +110,13 @@ def run():
     base_dir = 'Data/img_out'
     img_paths = os.listdir(base_dir)
 
-    with open(r'Data\inmylane.pickle', 'rb') as f:
+    with open(r'Data\car_close.pickle', 'rb') as f:
         in_my_lane = pickle.load(f)
     in_my_lane = [elem[1] for elem in in_my_lane]
 
     lane_no = 0.0
     im_no = 0.0
+    future = 0
     last_meassurs = None
     for ti,spe,accs,steer in zip(time_stamps,veh_disp_spd_normalized,veh_acc_normalized,stw_ang_normalized):
 
@@ -115,10 +130,12 @@ def run():
         img = cv.imread(os.path.join(base_dir,img_paths[im_no_int]), 1)
         no_break = in_my_lane[lane_no_int]
         im_no += 1.9
-        lane_no += 1
-        arrow_length, arrow_width, arrow_courve, arrow_color = get_angle_paramerters(last_meassurs, spe,accs,steer, no_break)
+        lane_no += 0.37
+        future += 1
+
+        arrow_length, arrow_width, arrow_courve, arrow_color, future_arrow_curve = get_angle_paramerters(last_meassurs, spe,accs,steer, no_break, stw_ang_normalized[future+6])
         last_meassurs = [spe,accs,steer]
-        arrow = get_arrow(arrow_length, arrow_width, arrow_courve, arrow_color)
+        arrow = get_arrow(arrow_length, arrow_width, arrow_courve, arrow_color, future_arrow_curve)
         frame_with_arrow = add_arrow_to_frame(img, arrow)
         cv.imshow('Car_View', frame_with_arrow)
         cv.waitKey(1)
